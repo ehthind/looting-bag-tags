@@ -1,0 +1,19 @@
+.gradle
+build
+.idea/
+.project
+.settings/
+.classpath
+nbactions.xml
+nb-configuration.xml
+nbproject/
+*.class
+.tools/
+.reference/
+.runtime/
+dist/
+__pycache__/
+# Local launcher tooling and development notes are not part of the public plugin.
+/scripts/
+/AGENTS.md
+/CLAUDE.md
