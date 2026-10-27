@@ -26,6 +26,7 @@ import org.mockito.stubbing.Answer;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -34,6 +35,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -119,7 +121,59 @@ public class LootingBagTagWriterTest
 	}
 
 	@Test
-	public void existingManagedTabIsAnEntirelyUnchangedNoOp()
+	public void existingManagedTabAppendsNewTypesAndPreservesExistingMembersAndIcon()
+	{
+		configuration.put(OWNED_NAME_KEY, TAG_NAME);
+		configuration.put(TAB_NAMES_KEY, "gear," + TAG_NAME);
+		configuration.put("banktags.icon_" + TAG_NAME, "1234");
+		itemTags.put(100, tags(TAG_NAME, "gear"));
+		itemTags.put(200, tags("supplies"));
+		Map<String, String> originalConfiguration = new HashMap<>(configuration);
+
+		assertFalse(writer.addDepositedItems(ids(100, 200, 300)));
+
+		assertEquals(originalConfiguration, configuration);
+		assertEquals(tags(TAG_NAME, "gear"), itemTags.get(100));
+		assertEquals(tags(TAG_NAME, "supplies"), itemTags.get(200));
+		assertEquals(tags(TAG_NAME), itemTags.get(300));
+		verify(configManager).getConfiguration("banktags", "tagtabs");
+		verify(configManager).getConfiguration("lootingbagtags", "managedTag");
+		verifyNoMoreInteractions(configManager);
+		verify(tagManager).getItemsForTag(TAG_NAME);
+		verify(tagManager).addTag(200, TAG_NAME, false);
+		verify(tagManager).addTag(300, TAG_NAME, false);
+		verifyNoMoreInteractions(tagManager);
+		verifyNoInteractions(tabManager);
+		verify(bankSearch).layoutBank();
+	}
+
+	@Test
+	public void secondBagTripAppendsItemTypesToTheSameTab()
+	{
+		configuration.put(OWNED_NAME_KEY, TAG_NAME);
+		configuration.put(TAB_NAMES_KEY, "gear");
+		assertTrue(writer.addDepositedItems(ids(100, 200)));
+		TagTab originalTab = liveTabs.get(0);
+		Map<String, String> createdConfiguration = new HashMap<>(configuration);
+
+		assertFalse(writer.addDepositedItems(ids(200, 300)));
+
+		assertEquals(tags(TAG_NAME), itemTags.get(100));
+		assertEquals(tags(TAG_NAME), itemTags.get(200));
+		assertEquals(tags(TAG_NAME), itemTags.get(300));
+		assertEquals(createdConfiguration, configuration);
+		assertEquals(1, liveTabs.size());
+		assertSame(originalTab, liveTabs.get(0));
+		verify(tagManager).addTag(100, TAG_NAME, false);
+		verify(tagManager).addTag(200, TAG_NAME, false);
+		verify(tagManager).addTag(300, TAG_NAME, false);
+		verify(tagManager).removeTag(TAG_NAME);
+		verify(tabManager).add(any(TagTab.class));
+		verify(bankSearch, times(2)).layoutBank();
+	}
+
+	@Test
+	public void repeatedDepositsOfAlreadyTaggedTypesDoNotWriteOrRefresh()
 	{
 		configuration.put(OWNED_NAME_KEY, TAG_NAME);
 		configuration.put(TAB_NAMES_KEY, "gear," + TAG_NAME);
@@ -127,15 +181,18 @@ public class LootingBagTagWriterTest
 		itemTags.put(100, tags(TAG_NAME, "gear"));
 		Map<String, String> originalConfiguration = new HashMap<>(configuration);
 
-		assertFalse(writer.createIfMissing(ids(200, 300)));
+		assertFalse(writer.addDepositedItems(ids(100)));
+		assertFalse(writer.addDepositedItems(ids(100, null, 0, -1)));
 
 		assertEquals(originalConfiguration, configuration);
 		assertEquals(tags(TAG_NAME, "gear"), itemTags.get(100));
-		assertFalse(itemTags.containsKey(200));
-		verify(configManager).getConfiguration("banktags", "tagtabs");
-		verify(configManager).getConfiguration("lootingbagtags", "managedTag");
+		assertEquals(1, itemTags.size());
+		verify(tagManager, times(2)).getItemsForTag(TAG_NAME);
+		verifyNoMoreInteractions(tagManager);
+		verify(configManager, times(2)).getConfiguration("banktags", "tagtabs");
+		verify(configManager, times(2)).getConfiguration("lootingbagtags", "managedTag");
 		verifyNoMoreInteractions(configManager);
-		verifyNoInteractions(pluginManager, injector, tagManager, tabManager, bankSearch);
+		verifyNoInteractions(tabManager, bankSearch);
 	}
 
 	@Test
@@ -147,7 +204,7 @@ public class LootingBagTagWriterTest
 		itemTags.put(100, tags("gear"));
 		itemTags.put(300, tags("skilling"));
 
-		assertTrue(writer.createIfMissing(ids(100, 200)));
+		assertTrue(writer.addDepositedItems(ids(100, 200)));
 
 		assertEquals(Arrays.asList("gear", "skilling", TAG_NAME), savedTabs());
 		assertEquals("9876", configuration.get("banktags.icon_gear"));
@@ -171,7 +228,7 @@ public class LootingBagTagWriterTest
 		itemTags.put(200, tags(TAG_NAME + " 3"));
 		String chosenName = TAG_NAME + " 4";
 
-		assertTrue(writer.createIfMissing(ids(300)));
+		assertTrue(writer.addDepositedItems(ids(300)));
 
 		assertEquals(chosenName, writer.getTagName());
 		assertEquals(chosenName, configuration.get(OWNED_NAME_KEY));
@@ -192,18 +249,21 @@ public class LootingBagTagWriterTest
 		itemTags.put(100, tags(TAG_NAME, "gear"));
 		itemTags.put(200, tags(TAG_NAME));
 		itemTags.put(300, tags("supplies"));
-		assertFalse(writer.createIfMissing(ids(400)));
+		assertFalse(writer.addDepositedItems(ids(400)));
+		assertEquals(tags(TAG_NAME), itemTags.get(400));
 
 		// RuneLite permits deleting a tab while retaining its item tags.
 		configuration.put(TAB_NAMES_KEY, "gear");
-		assertTrue(writer.createIfMissing(ids(300)));
+		assertTrue(writer.addDepositedItems(ids(300)));
 
 		assertEquals(Arrays.asList("gear", TAG_NAME), savedTabs());
 		assertEquals(tags("gear"), itemTags.get(100));
 		assertTrue(itemTags.get(200).isEmpty());
 		assertEquals(tags("supplies", TAG_NAME), itemTags.get(300));
-		assertFalse(itemTags.containsKey(400));
+		assertTrue(itemTags.get(400).isEmpty());
 		verify(tagManager).removeTag(TAG_NAME);
+		verify(tagManager, times(2)).getItemsForTag(TAG_NAME);
+		verify(tagManager).addTag(400, TAG_NAME, false);
 		verify(tagManager).addTag(300, TAG_NAME, false);
 		verifyNoMoreInteractions(tagManager);
 	}
@@ -215,7 +275,7 @@ public class LootingBagTagWriterTest
 		configuration.put(TAB_NAMES_KEY, "gear,skilling,quests");
 		assertTrue(liveTabs.isEmpty());
 
-		assertTrue(writer.createIfMissing(ids(100)));
+		assertTrue(writer.addDepositedItems(ids(100)));
 
 		assertEquals(Arrays.asList("gear", "skilling", "quests", TAG_NAME), savedTabs());
 		assertEquals(1, liveTabs.size());

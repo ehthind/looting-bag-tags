@@ -1,6 +1,7 @@
 package com.lootingbagtags;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import javax.inject.Inject;
@@ -43,24 +44,28 @@ public class LootingBagTagWriter
 	}
 
 	/**
-	 * Creates and fills the managed tab only when the user has deleted it.
-	 * An existing tab, including its item tags and icon, is left entirely unchanged.
+	 * Adds confirmed bag deposits to the managed tab, creating it when missing.
+	 * Existing memberships and the user's tab icon are preserved across trips.
 	 *
 	 * @return whether a tab was created
 	 */
-	public boolean createIfMissing(Set<Integer> canonicalIds)
+	public boolean addDepositedItems(Set<Integer> canonicalIds)
 	{
 		String savedTabs = configManager.getConfiguration(
 			BankTagsPlugin.CONFIG_GROUP, BankTagsPlugin.TAG_TABS_CONFIG);
 		List<String> tabNames = new ArrayList<>(Text.fromCSV(savedTabs == null ? "" : savedTabs));
 		String managedName = configManager.getConfiguration(CONFIG_GROUP, MANAGED_TAG_KEY);
+		Plugin bankTags = getBankTagsPlugin();
+		TagManager tagManager = bankTags.getInjector().getInstance(TagManager.class);
 		if (managedName != null && !managedName.isEmpty() && tabNames.contains(managedName))
 		{
+			if (addMissingItems(tagManager, managedName, canonicalIds))
+			{
+				bankTags.getInjector().getInstance(BankSearch.class).layoutBank();
+			}
 			return false;
 		}
 
-		Plugin bankTags = getBankTagsPlugin();
-		TagManager tagManager = bankTags.getInjector().getInstance(TagManager.class);
 		if (managedName == null || managedName.isEmpty())
 		{
 			managedName = DEFAULT_TAG_NAME;
@@ -75,13 +80,7 @@ public class LootingBagTagWriter
 		// Deleting a tab can leave its old item tags behind. Clear only our own tag
 		// before recreating it so this new bag never inherits a previous bag's loot.
 		tagManager.removeTag(managedName);
-		for (Integer itemId : canonicalIds)
-		{
-			if (itemId != null && itemId > 0)
-			{
-				tagManager.addTag(itemId, managedName, false);
-			}
-		}
+		addMissingItems(tagManager, managedName, canonicalIds);
 
 		configManager.setConfiguration(BankTagsPlugin.CONFIG_GROUP,
 			BankTagsPlugin.TAG_ICON_PREFIX + managedName, ItemID.LOOTING_BAG);
@@ -104,6 +103,21 @@ public class LootingBagTagWriter
 		// The configuration merge above preserves every existing tab in that case.
 		bankTags.getInjector().getInstance(BankSearch.class).layoutBank();
 		return true;
+	}
+
+	private boolean addMissingItems(TagManager tagManager, String tagName, Set<Integer> canonicalIds)
+	{
+		Set<Integer> taggedIds = new HashSet<>(tagManager.getItemsForTag(tagName));
+		boolean changed = false;
+		for (Integer itemId : canonicalIds)
+		{
+			if (itemId != null && itemId > 0 && taggedIds.add(itemId))
+			{
+				tagManager.addTag(itemId, tagName, false);
+				changed = true;
+			}
+		}
+		return changed;
 	}
 
 	private Plugin getBankTagsPlugin()

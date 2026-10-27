@@ -10,7 +10,7 @@ public interface LootingBagTagsConfig extends Config
 	@ConfigItem(
 		keyName = "openAfterDeposit",
 		name = "Open newly created tab",
-		description = "Show the new bag tag after creating it. An existing tab is never refreshed or changed. Quantities are bank totals.",
+		description = "Show the bag tag when first created. Later deposits add item types without switching tabs. Quantities are bank totals.",
 		position = 0
 	)
 	default boolean openAfterDeposit()

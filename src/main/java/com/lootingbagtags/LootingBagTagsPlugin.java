@@ -153,7 +153,7 @@ public class LootingBagTagsPlugin extends Plugin
 			return;
 		}
 
-		boolean created = tagWriter.createIfMissing(deposited);
+		boolean created = tagWriter.addDepositedItems(deposited);
 		if (created && config.openAfterDeposit())
 		{
 			bankTagsService.openBankTag(tagWriter.getTagName(), BankTagsService.OPTION_ALLOW_MODIFICATIONS);

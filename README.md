@@ -3,7 +3,7 @@
 ![Looting Bag Tags icon](icon.png)
 
 Creates a Bank Tags tab with a looting bag icon when you deposit items from your
-looting bag. It helps you find that bag's loot even when you already have the
+looting bag. It collects loot across trips, even when you already have the
 same items elsewhere in your bank.
 
 ## How to use
@@ -11,13 +11,13 @@ same items elsewhere in your bank.
 1. Deposit your looting bag into the bank.
 2. If the plugin's tab is missing, it creates **looting bag deposits** and adds
    the item types that moved from the bag into the bank.
-3. While the tab exists, further deposits leave it unchanged.
+3. Later looting bag deposits add new item types to the same tab, keeping the
+   items from previous trips.
 4. Delete the tab after selling your loot. The next bag deposit creates a fresh
    tab, even if you left the previous tab's items tagged when deleting it.
 
 If the default name already belongs to another tag, the plugin chooses a
-numbered name. Your other tabs and tags remain intact. The **Open newly created
-tab** setting controls whether the new tab opens automatically.
+numbered name. Your other tabs and tags remain intact.
 
 **Quantities are your whole bank stacks.** Withdraw-All takes everything you
 own of an item, including stock you had before the trip. Use Withdraw-X to keep
@@ -47,8 +47,8 @@ For a Jagex account, follow RuneLite's official
 [Using Jagex Accounts guide](https://github.com/runelite/runelite/wiki/Using-Jagex-Accounts)
 to sign in to the development client.
 
-When testing in game, check the first bag deposit, a later deposit while the tab
-exists, and recreating a deleted tab. Include items already in the bank and
+When testing in game, check the first bag deposit, new item types added on later
+trips, and recreating a deleted tab. Include items already in the bank and
 confirm ordinary inventory deposits and unrelated tabs are unaffected.
 
 ## License
